@@ -1,20 +1,9 @@
 # Archlinux Installation Guide
 
-There are a lot of good guides out there and as with this one, they are somewhat oppionionated based on the authors
-hardware and preferences. A really good start, although a bit more complicated for a beginner is the 
-[official installation guide](https://wiki.archlinux.org/title/Installation_guide). 
-
-This guide is for using UEFI with systemd-boot, AMD cpu & gpu && Gnome desktop. I've selected systemd-boot instead of 
-grub because I want to have flicker-free boot splash, it's easier to install and I'm running only Arch anyway 
-on my machine.
-
-Great guides helping you through:
+[Official Arch Linux guide](https://wiki.archlinux.org/title/Installation_guide). 
 [Modern Arch linux installation guide by mjkstra](https://gist.github.com/mjkstra/96ce7a5689d753e7a6bdd92cdc169bae)
 
 ## Preparation
-
-Preparing is about internet connection and correct time. The rest is more about making installation a bit more 
-convinient.
 
 - List all keyboard layouts to find the right one
     ```
@@ -26,12 +15,12 @@ convinient.
         loadkeys et
     ```
 
-- Set bigger font if text is too small
+- Set bigger font if text is too small. 
     ```
-        setfont ter-i32b
+        setfont ter-i28b
     ```
 
-- Check if in UEFI mode (the output has to be 32 or 64)
+- Verify UEFI boot mode (the output has to be 32 or 64)
     ```
         cat /sys/firmware/efi/fw_platform_size
     ```
@@ -80,9 +69,7 @@ convinient.
 
 ## Installation
 
-### Creating partitions
-
-For partitioning we're using fdisk. The following section does not include default selections with <ENTER>
+### Partitioning disk
 
 - First find the right device, mine is /dev/nvme0n1
     ```
@@ -94,7 +81,7 @@ For partitioning we're using fdisk. The following section does not include defau
         fdisk nvme0n1
     ```
 
-- Delete any existing partitionsi (incase you're not planning on dual booting)
+- For clean installation, delete any existing partitions. Do not do this, if you plan on dualbooting.
     ```
        d 
     ```
@@ -116,21 +103,29 @@ For partitioning we're using fdisk. The following section does not include defau
         1
     ```
 
-- Whether or not to use swap is up to you. I use it for improved stability. 
+- Swap is not a must but is recommended for creater stability 
     ```
         n
-        this section needs update
+        +4G
     ```
 
 - Select swap as type
     ```
-        this section needs update
+        t
+        2
+        19
     ```
 
 - Create Linux EXT4 filesystem
     ```
         n
-        p
+    ```
+
+- Select EXT4 as type
+    ```
+        t
+        3
+        20
     ```
 
 - Write changes and quit
@@ -148,52 +143,77 @@ For partitioning we're using fdisk. The following section does not include defau
 
 - Format EFI partition with FAT32 system
     ```
-        mkfs.fat -F 32 /dev/efi_system_partition
+        mkfs.fat -F 32 /dev/nvme0n1p1
     ```
 
 - Format swap partition
     ```
-        mkswap /dev/swap_partition
+        mkswap /dev/nvme0n1p2
     ```
 
 - Format system partition
     ```
-        mkfs.ext4 /dev/root_partition
+        mkfs.ext4 /dev/nvme0n1p3
     ```
 
 ### Mounting disks 
 
-- Mount previously created EFI partition so we could install bootloader onto it. Remember the bootloaders directory
-  for later installation. In this case its /mnt/boot
-    ```
-        mount --mkdir /dev/efi_system_partition /mnt/boot
-    ```
+The mounting **order is important**. This is because we need to mount system first and then the EFI partition on to 
+the system mount. Unless we do this, kernel image is not going to be installed to the correct place and we're 
+not going to be able to boot.
 
-- Mount prevously created system EXT4 partition
+- First mount our EXT4 system partition to the /mnt 
     ```
-        mount /dev/root_partition /mnt
+        mount /dev/nvme0n1p3 /mnt
+    ``` 
+
+- Only then mount EFI to the mounted systems /boot
+    ```
+        mount /dev/nvme0n1p1 /mnt/boot
     ``` 
 
 - If you created swap volume, enable it
     ```
-        swapon /dev/swap_partition 
+        swapon /dev/nvme0n1p2 
     ``` 
 
-### Installing essential packages
-
-- Now install essential packages to be able to boot into the new installation and connect to the internet. 
+- We need to generate filesystem table for the system to know what partitions should be mounted every time.  
+  The table is saved to the systems /etc/fstab. This is generated based on the currently mounted partitions.
     ```
-        pacstrap -K /mnt base linux linux-firmware amd-ucode networkmanager pipewire pipewire-alsa 
-        pipewire-pulse pipewire-jack wireplumber man sudo
+        genfstab -U /mnt >> /mnt/etc/fstab
     ``` 
+
+### Installing base packages 
+
+- Now we need to install the kernel, base pacakges, drivers and utils we might need right away after rooting to 
+  our new system (which is the next step) and after first reboot.
+  
+  #### Packages we're installing:
+
+  - base base-devel linux linux-firmware amd-ucode
+    Kernel, firmware, system packages and packages necessary to build.
+
+  - amdvlk
+    AMD maintained Vulkan 3D drivers
+
+  - networkmanager, bluez, bluez-utils
+    Network manager for managing wired and wireless connections and bluetooth drivers and utils
+
+  - pipewire, pipewire-alsa, pipewire-jack, pipewire-pulse
+    Audio drivers and utils
+
+  - plymouth
+    Boot splash screen
+
+  - man, sudo, git, wget, curl, nvim, terminus-font
+    Basic utilities
+    
+    ```
+        pacstrap -K /mnt base base-devel linux linux-firmware amd-ucode amdvlk networkmanager bluez bluez-utils pipewire 
+        pipewire-alsa pipewire-pulse pipewire-jack wireplumber plymouth man sudo git curl wget nvim terminus-font
+    ```
 
 ### Configuring the system
-
-- Generate instructions for the system on how to mount the disks automatically
-    ```
-        pacstrap -K /mnt base linux linux-firmware amd-ucode networkmanager pipewire pipewire-alsa 
-        pipewire-pulse pipewire-jack wireplumber man sudo neovim
-    ``` 
 
 - Change root into the new system
     ```
@@ -210,19 +230,20 @@ For partitioning we're using fdisk. The following section does not include defau
         ln -sf /usr/share/zoneinfo/Europe/Tallinn /etc/localtime
     ```
 
-- Sync system time
+- Sync hardware clock to system time
     ```
         hwclock --systohc
+    ```
+
+- Uncomment the locales (system languages) you wish to be available. This has to be done before generating the 
+  locale file.
+    ```
+        nvim /etc/locale.gen
     ```
 
 - Generate locale file
     ```
-        hwclock --systohc
-    ```
-
-- Uncomment the locales (system languages) you wish to be available
-    ```
-        nvim /etc/locale.gen
+       locale-gen 
     ```
 
 - Set preferred locale to use
@@ -230,13 +251,19 @@ For partitioning we're using fdisk. The following section does not include defau
         echo LANG=en_US.UTF-8 >> /etc/locale.conf
     ```
 
-
-- Set persistent keyboard layout
+- Set persistent keyboard layout for TTY
     ```
         echo KEYMAP=et >> /etc/vconsole.conf
     ```
 
-- Set your hostname
+- Set persistently larger TTY font. This is personal preference and depends on your screen. Different font sizes
+  are available like ter-124, ter-122, ter-116 etc. To use bold font, add b at the end, n for normal. The font we use
+  is previously installed terminus-font.
+    ```
+        echo FONT=ter-128b >> /etc/vconsole.conf
+    ```
+
+- Set your hostname, I use ArchPad
     ```
         echo ArchPad >> /etc/hostname
     ```
@@ -248,15 +275,62 @@ For partitioning we're using fdisk. The following section does not include defau
         127.0.1.1 ArchPad
     ```
 
-## Setting up bootloader
+### Setting up bootloader
 
-- Arch has systemd already installed, installing systemd-boot bootloader is straight forward if EFI boot
-  partition is mounted to either /efi or /boot
+There are various options when it comes to bootloaders. The most popular and one of the older ones is GRUB for which
+there is problably most information online. I want to have flicker free splash screen during booting so I'm going for
+newer systemd-boot. Systemd-boot is part of systemd so it's already present on the system. To install the bootloader
+we need to have EFI mounted on our systems /boot or /efi. We already did that at the beginning while being on the 
+root of the installation iso. Secondly we need to install the bootloader with bootctl and third, et the loader entry
+which is a pointer, where the loader should boot off to (with couple of flags passed for splash screen).
+
+- First, lets configure previously installed boot splash plymouth to show up. For that we need to edit the 
+  /etc/mkinitcpio.conf file. Go to HOOKS=(...) line and add "plymouth" to it. If you are using the systemd hook, it 
+  must be before plymouth. Furthermore make sure you place plymouth before the crypt hook if your system is encrypted 
+  with dm-crypt. Since I'm not using either, I'm adding plymouth as the first hook.
+    ```
+        HOOKS=(plymouth base udev autodetect microcode modconf kms keyboard keymap consolefont block filesystems fsck)
+    ```
+
+- Install bootloader
     ```
         bootctl install
     ```
 
-## Setting up root and users
+- Go to loader directory
+    ```
+        cd /boot/loader 
+    ```
+
+- Edit the loader.conf file to look like this. With the default arch-* line, we're stating that the default boot 
+  should be the entry named arch.
+    ```
+        #timeout 3 
+        #console-mode keep
+        default arch-*
+    ```
+
+- Lastly we need to create the entry, go to entries directory
+    ```
+        cd entries 
+    ```
+
+- Create file with the name stated in the loader.conf file (default arch-*)
+    ```
+        touch arch.conf
+    ```
+
+- Edit the arch.conf (nvim arch.conf) and have the file looking like this. Incase you installed different kernel,
+  you'll see the filenames of linux and initrd by listing /boot directory contents. Options should point to your
+  system partition, quiet and splash are required for the plymouth boot splash
+    ```
+        title	Arch Linux
+        linux	/vmlinuz-linux
+        initrd	/initramfs-linux.img
+        options	root=/dev/nvme0n1p3 rw quiet splash
+    ```
+
+### Setting up root and users
 
 - Set root users password
     ```
@@ -275,11 +349,27 @@ For partitioning we're using fdisk. The following section does not include defau
     ```
     Uncomment this line: %wheel ALL=(ALL:ALL) ALL
 
-## Rebooting
+### Setting up desktop
+
+- Install Gnome
+    ```
+        pacman -S gnome
+    ```
+
+### Rebooting
+- Start GDM service so Gnome Display Manager would run after reboot
+    ```
+        systemctl enable gdm.service
+    ```
 
 - Enable network manager as service to connect to internet after reboot
     ```
         systemctl enable NetworkManager
+    ```
+
+- Exit back to installation iso root
+    ```
+        exit
     ```
 
 - Unmount mounted volumes 
@@ -294,25 +384,5 @@ For partitioning we're using fdisk. The following section does not include defau
 
 ## After reboot
 
-- Install Wayland
-    ```
-        sudo pacman -S --needed wayland
-    ```
-
-- Install Gnome Display Manager
-    ```
-        pacman -S gdm
-    ```
-
-- Enable GDM service so we'll be booted into GDM
-
-    ```
-        sudo systemctl enable gdm
-    ```
-
-- Install various Gnome packages
-    ```
-        pacman -S --needed xorg-xwayland xorg-xlsclients glfw-wayland
-    ```
-
-
+We'll, if the Linux Gods we're gracious enough, you should now be booted onto you're newly installed Arch.
+The world is yours!
