@@ -205,12 +205,12 @@ not going to be able to boot.
   - plymouth
     Boot splash screen
 
-  - man, sudo, git, wget, curl, nvim, terminus-font
+  - man, sudo, openssh, git, wget, curl, nvim, terminus-font
     Basic utilities
     
     ```
         pacstrap -K /mnt base base-devel linux linux-firmware amd-ucode amdvlk networkmanager bluez bluez-utils pipewire 
-        pipewire-alsa pipewire-pulse pipewire-jack wireplumber plymouth man sudo git curl wget nvim terminus-font
+        pipewire-alsa pipewire-pulse pipewire-jack wireplumber plymouth man sudo openssh git curl wget nvim terminus-font
     ```
 
 ### Configuring the system
@@ -349,7 +349,7 @@ which is a pointer, where the loader should boot off to (with couple of flags pa
     ```
     Uncomment this line: %wheel ALL=(ALL:ALL) ALL
 
-### Setting up desktop
+### Setting up Gnome desktop
 
 - Install Gnome
     ```
@@ -383,6 +383,15 @@ which is a pointer, where the loader should boot off to (with couple of flags pa
     ```
 
 ## After reboot
+
+- Log in with your username and password
+
+- Set up AUR helper
+
+- Start Gnome Keyring service so ssh-agent would be automatically started
+    ```
+        systemctl --user enable gcr-ssh-agent.socket
+    ```
 
 We'll, if the Linux Gods we're gracious enough, you should now be booted onto you're newly installed Arch.
 The world is yours!
