@@ -367,6 +367,16 @@ which is a pointer, where the loader should boot off to (with couple of flags pa
         systemctl enable NetworkManager
     ```
 
+- Enable bluetooth service 
+    ```
+        systemctl enable bluetooth.service
+    ```
+
+- Start Gnome Keyring service so ssh-agent would be automatically started
+    ```
+        systemctl --user enable gcr-ssh-agent.socket
+    ```
+
 - Exit back to installation iso root
     ```
         exit
@@ -388,10 +398,6 @@ which is a pointer, where the loader should boot off to (with couple of flags pa
 
 - Set up AUR helper
 
-- Start Gnome Keyring service so ssh-agent would be automatically started
-    ```
-        systemctl --user enable gcr-ssh-agent.socket
-    ```
 
 We'll, if the Linux Gods we're gracious enough, you should now be booted onto you're newly installed Arch.
 The world is yours!
