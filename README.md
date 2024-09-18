@@ -193,6 +193,9 @@ not going to be able to boot.
   - base base-devel linux linux-firmware amd-ucode
     Kernel, firmware, system packages and packages necessary to build.
 
+  - fwupd
+    Firmware update utility
+
   - amdvlk
     AMD maintained Vulkan 3D drivers
 
@@ -205,12 +208,12 @@ not going to be able to boot.
   - plymouth
     Boot splash screen
 
-  - man, sudo, openssh, git, wget, curl, nvim, terminus-font
+  - man, sudo, openssh, git, wget, curl, nvim, wl-clipboard, terminus-font
     Basic utilities
     
     ```
-        pacstrap -K /mnt base base-devel linux linux-firmware amd-ucode amdvlk networkmanager bluez bluez-utils pipewire 
-        pipewire-alsa pipewire-pulse pipewire-jack wireplumber plymouth man sudo openssh git curl wget nvim terminus-font
+        pacstrap -K /mnt base base-devel linux linux-firmware fwupd amd-ucode amdvlk networkmanager bluez bluez-utils pipewire 
+        pipewire-alsa pipewire-pulse pipewire-jack wireplumber plymouth man sudo openssh git curl wget nvim wl-clipboard terminus-font
     ```
 
 ### Configuring the system
@@ -357,9 +360,14 @@ which is a pointer, where the loader should boot off to (with couple of flags pa
     ```
 
 ### Rebooting
-- Start GDM service so Gnome Display Manager would run after reboot
+- Enable GDM service so Gnome Display Manager would run after reboot
     ```
         systemctl enable gdm.service
+    ```
+
+- Enable audio system service 
+    ```
+        sudo systemctl enable --global pipewire-pulse
     ```
 
 - Enable network manager as service to connect to internet after reboot
