@@ -88,7 +88,7 @@
 
 - Start fdisk on the device
     ```
-        fdisk nvme0n1
+        fdisk /dev/nvme0n1
     ```
 
 - For clean installation, delete any existing partitions. Do not do this, if you plan on dualbooting.
@@ -179,18 +179,12 @@ not going to be able to boot.
 
 - Only then mount EFI to the mounted systems /boot
     ```
-        mount /dev/nvme0n1p1 /mnt/boot
+        mount --mkdir /dev/nvme0n1p1 /mnt/boot
     ``` 
 
 - If you created swap volume, enable it
     ```
         swapon /dev/nvme0n1p2 
-    ``` 
-
-- We need to generate filesystem table for the system to know what partitions should be mounted every time.  
-  The table is saved to the systems /etc/fstab. This is generated based on the currently mounted partitions.
-    ```
-        genfstab -U /mnt >> /mnt/etc/fstab
     ``` 
 
 ### Installing base packages 
@@ -227,6 +221,13 @@ not going to be able to boot.
     ```
 
 ### Configuring the system
+
+- We need to generate filesystem table for the system to know what partitions should be mounted every time.  
+  The table is saved to the systems /etc/fstab. This is generated based on the currently mounted partitions.
+    ```
+        genfstab -U /mnt >> /mnt/etc/fstab
+    ``` 
+
 
 - Change root into the new system
     ```
