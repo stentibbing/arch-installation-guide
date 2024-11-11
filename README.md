@@ -25,6 +25,11 @@
         cat /sys/firmware/efi/fw_platform_size
     ```
 
+- Start DHCP client
+    ```
+        dhcpcd && dhcpcd wlan0
+    ```
+
 - If you don't need to connect to internet via wifi, skip this section
 
     - Launch iwctl
@@ -41,15 +46,20 @@
         ```
            station wlan0 scan 
         ```
+
+    - List networks 
+        ```
+           station wlan0 get-networks
+        ```
     
     - Connect to the network specified
         ```
            station wlan0 connect "Network SSID"
         ```
 
-    - Quit iwctl 
+    - Exit iwctl
         ```
-          quit 
+          CTRL-C
         ```
 
 - Check that you have working internet connection
