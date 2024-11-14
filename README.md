@@ -216,8 +216,8 @@ not going to be able to boot.
     Basic utilities
     
     ```
-        pacstrap -K /mnt base base-devel linux linux-firmware fwupd amd-ucode amdvlk networkmanager bluez bluez-utils pipewire 
-        pipewire-alsa pipewire-pulse pipewire-jack wireplumber plymouth man sudo openssh git curl wget nvim wl-clipboard terminus-font
+        pacstrap -K /mnt base base-devel linux linux-firmware fwupd amd-ucode amdgpu vulkan-radeon networkmanager bluez bluez-utils pipewire 
+        pipewire-alsa pipewire-pulse pipewire-jack wireplumber plymouth man sudo openssh git curl wget vim wl-clipboard terminus-font
     ```
 
 ### Configuring the system
