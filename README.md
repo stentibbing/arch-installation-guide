@@ -25,11 +25,20 @@
         cat /sys/firmware/efi/fw_platform_size
     ```
 
+- Check for wifi not being blocked by rfkill
+    ```
+        rfkill list
+    ```
+
+- If wifi is blocked, unblock by running
+    ```
+        rfkill unblock wlan
+    ```
+
 - Start DHCP client
     ```
         dhcpcd && dhcpcd wlan0
     ```
-
 - If you don't need to connect to internet via wifi, skip this section
 
     - Launch iwctl
@@ -214,10 +223,12 @@ not going to be able to boot.
 
   - man, sudo, openssh, git, wget, curl, nvim, wl-clipboard, terminus-font
     Basic utilities
-    
+
+  - xdg-utils
+    For defining default apps etc.
+
     ```
-        pacstrap -K /mnt base base-devel linux linux-firmware fwupd amd-ucode amdgpu vulkan-radeon networkmanager bluez bluez-utils pipewire 
-        pipewire-alsa pipewire-pulse pipewire-jack wireplumber plymouth man sudo openssh git curl wget vim wl-clipboard terminus-font
+        pacstrap -K /mnt base base-devel linux linux-firmware fwupd amd-ucode amdgpu vulkan-radeon networkmanager bluez bluez-utils pipewire xdg-utils pipewire-alsa pipewire-pulse pipewire-jack wireplumber plymouth man sudo openssh git curl wget vim wl-clipboard terminus-font
     ```
 
 ### Configuring the system
