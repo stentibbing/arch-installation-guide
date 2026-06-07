@@ -88,7 +88,7 @@
 
 ## Installation
 
-### Partitioning disk
+### Preparing Disk
 
 - First find the right device, mine is /dev/nvme0n1
     ```
@@ -122,29 +122,15 @@
         1
     ```
 
-- Swap is not a must but is recommended for creater stability 
+- Create LVM partition, taking up all the remaining space 
     ```
-        n
-        +4G
-    ```
-
-- Select swap as type
-    ```
-        t
-        2
-        19
+       n
     ```
 
-- Create Linux EXT4 filesystem
+- Select Linux LVM as type
     ```
-        n
-    ```
-
-- Select EXT4 as type
-    ```
-        t
-        3
-        20
+        t 
+        44
     ```
 
 - Write changes and quit
@@ -153,50 +139,65 @@
         q
     ```
 
-### Formating partitions
-
-- First find out partitions for formating
+- Wipe the disk clean of any previous data
     ```
-        fdisk -l
+        dd if=/dev/urandom of=/dev/nvme0n1p2 bs=1M status=progress
     ```
 
-- Format EFI partition with FAT32 system
+- Create LUKS encrypted contianer
     ```
-        mkfs.fat -F 32 /dev/nvme0n1p1
+        cryptsetup luksFormat /dev/nvme0n1p2
+    ```
+ 
+
+- Open the LUKS encrypted contianer
+    ```
+        cryptsetup open /dev/nvme0n1p2 cryptlvm
     ```
 
-- Format swap partition
+- Create physical volume into the containerˇ 
     ```
-        mkswap /dev/nvme0n1p2
-    ```
-
-- Format system partition
-    ```
-        mkfs.ext4 /dev/nvme0n1p3
+        pvcreate /dev/mapper/cryptlvm
     ```
 
-### Mounting disks 
-
-The mounting **order is important**. This is because we need to mount system first and then the EFI partition on to 
-the system mount. Unless we do this, kernel image is not going to be installed to the correct place and we're 
-not going to be able to boot.
-
-- First mount our EXT4 system partition to the /mnt 
+- Create volume group
     ```
-        mount /dev/nvme0n1p3 /mnt
-    ``` 
-
-- Only then mount EFI to the mounted systems /boot
+        vgcreate Encrypted /dev/mapper/cryptlvm
     ```
+
+- Create logical volumes into the volume group
+    ```
+        lvcreate -L 4G MyVolGroup -n swap
+        lvcreate -L 32G MyVolGroup -n root
+        lvcreate -l 100%FREE MyVolGroup -n home
+    ```
+
+- Reduce home size to leave space for e2scrub which scans for volume corruptions in the background
+    ```
+        lvreduce -L -256M MyVolGroup/home
+    ```
+
+- Format logical volumes 
+    ```
+        mkfs.ext4 /dev/MyVolGroup/root
+        mkfs.ext4 /dev/MyVolGroup/home
+        mkswap /dev/MyVolGroup/swap
+    ```
+
+- Format EFI partition
+    ```
+        mkfs.fat -F32 /dev/nvme0n1p1
+    ```
+
+- Mount filesystems
+    ```
+        mount /dev/MyVolGroup/root /mnt
+        mount --mkdir /dev/MyVolGroup/home /mnt/home
         mount --mkdir /dev/nvme0n1p1 /mnt/boot
-    ``` 
-
-- If you created swap volume, enable it
+        swapon /dev/MyVolGroup/swap
     ```
-        swapon /dev/nvme0n1p2 
-    ``` 
 
-### Installing base packages 
+### Installing packages 
 
 - Now we need to install the kernel, base pacakges, drivers and utils we might need right away after rooting to 
   our new system (which is the next step) and after first reboot.
@@ -238,7 +239,6 @@ not going to be able to boot.
     ```
         genfstab -U /mnt >> /mnt/etc/fstab
     ``` 
-
 
 - Change root into the new system
     ```
@@ -300,21 +300,36 @@ not going to be able to boot.
         127.0.1.1 ArchPad
     ```
 
-### Setting up bootloader
+### Set up root and users
 
-There are various options when it comes to bootloaders. The most popular and one of the older ones is GRUB for which
-there is problably most information online. I want to have flicker free splash screen during booting so I'm going for
-newer systemd-boot. Systemd-boot is part of systemd so it's already present on the system. To install the bootloader
-we need to have EFI mounted on our systems /boot or /efi. We already did that at the beginning while being on the 
-root of the installation iso. Secondly we need to install the bootloader with bootctl and third, et the loader entry
-which is a pointer, where the loader should boot off to (with couple of flags passed for splash screen).
-
-- First, lets configure previously installed boot splash plymouth to show up. For that we need to edit the 
-  /etc/mkinitcpio.conf file. Go to HOOKS=(...) line and add "plymouth" to it. If you are using the systemd hook, it 
-  must be before plymouth. Furthermore make sure you place plymouth before the crypt hook if your system is encrypted 
-  with dm-crypt. Since I'm not using either, I'm adding plymouth as the first hook.
+- Set root users password
     ```
-        HOOKS=(plymouth base udev autodetect microcode modconf kms keyboard keymap consolefont block filesystems fsck)
+        passwd
+    ```
+
+- Create new user and set password
+    ```
+        useradd -mG wheel [username]
+        passwd [username]
+    ```
+
+- Set neovim as visudo editor and enable wheel group as sudoers
+    ```
+        EDITOR=nvim visudo 
+    ```
+    Uncomment this line: %wheel ALL=(ALL:ALL) ALL
+
+
+### Setting up boot
+
+- Configure mkinitcpio
+    ```
+        HOOKS=(base systemd autodetect microcode modconf kms keyboard sd-vconsole block sd-encrypt lvm2 filesystems fsck)
+    ```
+
+- Generate initramfs
+    ```
+        mkinitcpio -p linux
     ```
 
 - Install bootloader
@@ -330,8 +345,6 @@ which is a pointer, where the loader should boot off to (with couple of flags pa
 - Edit the loader.conf file to look like this. With the default arch-* line, we're stating that the default boot 
   should be the entry named arch.
     ```
-        #timeout 3 
-        #console-mode keep
         default arch-*
     ```
 
@@ -346,39 +359,12 @@ which is a pointer, where the loader should boot off to (with couple of flags pa
     ```
 
 - Edit the arch.conf (nvim arch.conf) and have the file looking like this. Incase you installed different kernel,
-  you'll see the filenames of linux and initrd by listing /boot directory contents. Options should point to your
-  system partition, quiet and splash are required for the plymouth boot splash
+  you'll see the filenames of linux and initrd by listing /boot directory contents. Options should point to encrypted partition.
     ```
         title	Arch Linux
         linux	/vmlinuz-linux
         initrd	/initramfs-linux.img
-        options	root=/dev/nvme0n1p3 rw quiet splash
-    ```
-
-### Setting up root and users
-
-- Set root users password
-    ```
-        passwd
-    ```
-
-- Create new user and set password
-    ```
-        useradd -mG wheel [username]
-        passwd [username]
-    ```
-
-- Set neovim as visudo editor and enable wheel group as sudoers
-    ```
-        EDITOR=neovim visudo 
-    ```
-    Uncomment this line: %wheel ALL=(ALL:ALL) ALL
-
-### Setting up Gnome desktop
-
-- Install Gnome
-    ```
-        pacman -S gnome
+        options rd.luks.name=device-UUID=cryptlvm root=/dev/MyVolGroup/root rw rootfstype=ext4 rd.shell=0 rd.emergency=reboot
     ```
 
 ### Rebooting
@@ -422,12 +408,3 @@ which is a pointer, where the loader should boot off to (with couple of flags pa
         sudo reboot
     ```
 
-## After reboot
-
-- Log in with your username and password
-
-- Set up AUR helper
-
-
-We'll, if the Linux Gods we're gracious enough, you should now be booted onto you're newly installed Arch.
-The world is yours!
